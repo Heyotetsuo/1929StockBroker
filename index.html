@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html><head>
+<title>Old Games</title>
+<style>
+body{
+background-color:#000;
+text-align:center;
+color:#ddd;
+}
+canvas{
+width:460px;
+border:solid #ac7c00 8px
+}
+#jorbus-logo{
+width:700px;
+margin-bottom:11px;
+}
+</style>
+</head>
+
+<body onkeydown="og.moveChar(event)" onkeyup="og.stopChar(event)">
+<img id="jorbus-logo" src="_graphics/jorbus-logo.png"/><br>
+<canvas id="canvas" width="250" height="240" style="background-color:black">
+</canvas>
+
+
+
+<script>
+
+og = new Object()
+og.canvas = document.getElementById('canvas')
+og.ctx = og.canvas.getContext('2d')
+
+og.w = og.canvas.width
+og.h = og.canvas.height
+og.x = og.canvas.offsetLeft
+og.y = og.canvas.offsetTop
+
+og.height = 0
+
+og.keys = {}
+
+og.charBroker1 = new Image()
+og.charBroker1.src = '_graphics/charBroker1.png'
+og.charBroker2 = new Image()
+og.charBroker2.src = '_graphics/charBroker2.png'
+og.windows = new Image()
+og.windows.src = '_graphics/windows.png'
+og.windows.onload = function(){og.init()}
+og.lifebar = new Image()
+og.lifebar.src = '_graphics/lifebar.png'
+og.sky = new Image()
+og.sky.src = '_graphics/sky.png'
+
+og.sounds = {}
+og.sounds.coin = new Audio()
+og.sounds.coin.src = '_sfx/coin.wav'
+og.sounds.coin.voluem = .66
+og.sounds.win = new Audio()
+og.sounds.win.src = '_sfx/win.wav'
+og.sounds.win.volume = .5
+og.sounds.lose = new Audio()
+og.sounds.volume = .5
+og.sounds.lose.src = '_sfx/lose.wav'
+og.sounds.lose.volume = .5
+og.sounds.loop = new Audio()
+og.sounds.loop.src = '_sfx/loop.wav'
+og.sounds.loop.loop = true
+og.sounds.loop.volume = .3
+
+og.char = {
+	img: og.charBroker1,
+	x: 80,
+	y: 20,
+	cx: 45,
+	cy: 63,
+	offX: 27,
+	offY: 95
+}
+
+og.coins = [];
+og.Coin = function(index){
+	this.x = Math.round(Math.random()*240)
+	this.y = 250
+	this.cx = this.x-5
+	this.cy = this.y-5
+	this.img = new Image()
+	this.img.src = '_graphics/coin.png'
+	this.proximity = Math.abs((this.x-og.char.cx)+(this.y-og.char.cy))
+	return this
+}
+
+og.drawBG = function(){
+	this.ctx.fillStyle = '#787878'
+	this.ctx.fillRect(0, 0, og.w, og.h)
+
+	if (og.height < -240) og.height = 0;
+	this.ctx.drawImage(og.windows, 0, og.height -= 3)
+	this.ctx.drawImage(og.windows, 0, og.height + 240)
+}
+og.drawOverlay = function(){
+	var m = String('00'+Math.floor(this.timeRemaining/60)).slice(-2)
+	var s = String('00'+(this.timeRemaining-m*60)).slice(-2)
+	this.ctx.fillStyle = '#fff'
+	this.ctx.textAlign = 'center'
+	this.ctx.fillText('TIME LEFT BEFORE IMPACT', 122, 10)
+	this.ctx.fillText(m+':'+s, 122, 20)
+	this.ctx.textAlign = 'left'
+	this.ctx.fillText('Coins:'+og.coinCounter, 5, 236)
+
+	var lifeW = og.lifebar.width
+	var lifeH = og.lifebar.height
+	var lifeX = 250-lifeW
+	var lifeY = 240-lifeH
+	this.ctx.fillStyle = '#F8B800'
+	this.ctx.fillRect(lifeX, lifeY+3, og.heaven*1.36, lifeH/2)
+	this.ctx.fillRect(lifeX+3, lifeY, og.heaven*1.36, lifeH)
+	this.ctx.drawImage(og.lifebar, lifeX, lifeY)
+}
+
+og.drawCoins = function(){
+	for (var i=0; i<og.coins.length; i++){
+		var coin = og.coins[i]
+		var x = og.char.cx - og.char.img.offsetWidth/2
+		var y = og.char.cy - og.char.img.offsetHeight/2
+		var a = [x, y]
+		
+		var b = [coin.cx+coin.img.offsetWidth/2, coin.cy+coin.img.offsetHeight/2]
+		coin.proximity = [Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1])]
+		if (coin.y < -40){
+			og.coins.splice(i, 1)
+			i--
+			continue
+		}
+		if (coin.proximity[0] < 35 && coin.proximity[1] < 35){
+			og.coins.splice(i, 1)
+			og.drawBG()
+			this.ctx.fillRect(0, 0, 250, 240)
+			og.coinCounter++
+			og.heaven+=4
+			i--
+			og.sounds.coin.play()
+			continue
+		}
+		coin.cy -= 3
+		coin.y -= 3
+		this.ctx.drawImage(coin.img, coin.x, coin.y)
+	}
+}
+
+og.drawChar = function(x, y){
+	if (og.char.img == og.charBroker1){
+		og.char.img = og.charBroker2
+	} else {
+		og.char.img = og.charBroker1
+	}
+	og.ctx.drawImage(og.char.img, x, y)
+}
+
+og.moveChar = function(e){
+	og.keys[e.which] = true
+}
+og.stopChar = function(e){
+	delete og.keys[e.which]
+}
+
+og.update = function(){
+	og.ticks++
+	if (og.ticks%Math.round(Math.random()*300) == 0){
+		og.coins.push(new og.Coin(og.coins.length))
+	}
+	og.drawBG()
+	og.drawCoins()
+	if (og.heaven >= 100){
+		og.endGame(true)
+		og.drawChar(og.char.x, og.char.y)
+		return
+	}
+
+	if (og.char.blink){
+		og.char.img = null;
+		delete og.char.blink
+	}
+	og.keys[38] ? og.char.y -= 2 : null
+	og.keys[37] ? og.char.x -= 2 : null
+	og.keys[39] ? og.char.x += 2 : null
+	og.keys[40] ? og.char.y += 2 : null
+	og.char.cx = og.char.x+og.char.offX
+	og.char.cy = og.char.y+og.char.offY
+	og.drawChar(og.char.x, og.char.y)
+
+	og.drawOverlay()
+}
+
+og.init = function(){
+	og.ticks = 0
+	og.timeRemaining = 60
+	og.heaven = 0
+	og.coinCounter = 0
+	og.startScreen()
+	og.char.x = 80
+	og.char.y = 20
+	og.startScreenInterval = setInterval(og.startScreen, 2000)
+	document.onkeydown = function(){
+		og.startGame()
+		clearInterval(og.startScreenInterval)
+		this.onkeydown = null
+	}
+}
+
+og.startGame = function(){
+	og.updateInterval = setInterval(og.update, 1000/24)
+	og.countDownInterval = setInterval(function(){
+		og.timeRemaining--
+		if (og.timeRemaining < 0){
+			og.endGame()
+		}
+	}, 1000)
+	og.sounds.loop.play()
+}
+og.startScreen = function(){
+	og.canvas.width = og.canvas.width
+	og.drawBG()
+	setTimeout(function(){
+		og.ctx.fillStyle = '#fff'
+		og.ctx.textAlign = 'center'
+		og.ctx.fillText('press button to start', 125, 120)
+	}, 1000)
+}
+
+og.endGame = function(win){
+	clearInterval(og.updateInterval)
+	clearInterval(og.countDownInterval)
+	og.drawBG()
+	og.ctx.font = '20px Arial Black'
+	og.ctx.textAlign = 'center'
+	og.sounds.loop.pause()
+	if (win){
+		og.ctx.drawImage(og.sky, 0, 0)
+		og.ctx.fillStyle = '#F8B800'
+		og.ctx.fillText('YOU WENT', 120, 180)
+		og.ctx.fillText('TO HEAVEN', 120, 200)
+		og.sounds.win.play()
+	} else {
+		og.ctx.fillStyle = '#000'
+		og.ctx.fillRect(0,0,250,240)
+		og.ctx.fillStyle = '#fff'
+		og.ctx.fillText('YOU HIT', 120, 110)
+		og.ctx.fillText('THE GROUND', 120, 130)
+		og.sounds.lose.play()
+	}
+	setTimeout(og.init, 5000)
+}
+
+</script>
+
+</body></html>
